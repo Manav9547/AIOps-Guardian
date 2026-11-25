@@ -1,0 +1,50 @@
+# --- Secrets (dev-only values live in .env; real ones live in Vault) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+vault-*.json
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# --- ML artefacts (model is trained in Jenkins and baked into the guardian image) ---
+*.joblib
+*.pkl
+ml/models/
+# ml/data/training.csv IS committed (commit 46)
+
+# --- Helm / Kubernetes ---
+helm/*/charts/
+helm/*/Chart.lock
+*.tgz
+kubeconfig*
+
+# --- Load test output ---
+load/results/
+*.k6.json
+
+# --- Planning PDFs kept at repo root (docs/report.pdf is committed later) ---
+/*.pdf
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
