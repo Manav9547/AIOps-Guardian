@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from app import db
+from app import db, metrics
 from app.admission import SEARCH_QUEUE_TIMEOUT, QueueFull, search_limiter
 
 APP_VERSION = os.getenv("APP_VERSION", "dev")
@@ -25,6 +25,8 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Booking API", version=APP_VERSION, lifespan=lifespan)
+metrics.instrument(app)
+metrics.track_search_limiter(search_limiter)
 
 
 class BookingRequest(BaseModel):
