@@ -9,6 +9,9 @@ DOCKER_USER ?= changeme
 TAG         ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo dev)
 APP_IMAGE   := $(DOCKER_USER)/booking-api
 GUARD_IMAGE := $(DOCKER_USER)/aiops-guardian
+# Docker Compose v2 plugin if present, else the standalone binary
+COMPOSE     ?= $(shell docker compose version >/dev/null 2>&1 && echo "docker compose" || echo docker-compose)
+DEV_COMPOSE := $(COMPOSE) -f docker-compose.dev.yml --env-file .env
 
 define todo
 	@echo "make $@: not implemented yet (added in commit $(1))" >&2; exit 1
@@ -47,11 +50,15 @@ versions: ## Print installed tool versions to compare with the README
 
 ##@ Local development
 
-dev-up: ## Start app + Postgres with docker compose (commit 2)
-	$(call todo,2)
+dev-up: .env ## Start the dev stack (Postgres now; app added in commit 13)
+	$(DEV_COMPOSE) up -d --wait
 
-dev-down: ## Stop the dev compose stack (commit 2)
-	$(call todo,2)
+dev-down: ## Stop the dev compose stack (keeps the DB volume)
+	$(DEV_COMPOSE) down
+
+.env:
+	@echo "No .env found: creating it from .env.example" >&2
+	cp .env.example .env
 
 ##@ Quality
 
