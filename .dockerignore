@@ -1,0 +1,7 @@
+# Build context is the repo root; only app/ is copied into the image.
+*
+!app/
+app/tests/
+app/Dockerfile
+**/__pycache__
+**/*.py[cod]
