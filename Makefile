@@ -65,8 +65,8 @@ dev-down: ## Stop the dev compose stack (keeps the DB volume)
 lint: ## Run ruff over app/ and guardian/ (commit 14)
 	$(call todo,14)
 
-test: ## Run unit tests (commit 11)
-	$(call todo,11)
+test: .env ## Run tests in a Python 3.11 container with Postgres (ARGS="-k admin" to filter)
+	$(DEV_COMPOSE) --profile test run --rm --build test pytest $(ARGS)
 
 ##@ Build and release
 

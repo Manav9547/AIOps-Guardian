@@ -22,6 +22,30 @@ services:
       postgres:
         condition: service_healthy
 
+  # `make test` only (profile keeps it out of `make dev-up`). The repo is mounted
+  # read-only, so tests always run the code on disk without rebuilding.
+  test:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+      target: test
+    image: booking-api:test
+    user: "10001:10001"
+    working_dir: /src
+    volumes:
+      - ./:/src:ro
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TEST_POSTGRES_DB: booking_test   # tests never touch the dev database
+      REQUIRE_DB: "1"                  # fail, don't skip, if Postgres is unreachable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   postgres:
     image: postgres:16
     restart: unless-stopped

@@ -10,7 +10,15 @@ RUN python -m venv /venv
 COPY app/requirements.txt /tmp/requirements.txt
 RUN /venv/bin/pip install -r /tmp/requirements.txt
 
-# --- runtime stage: venv + code only, non-root ------------------------------
+# --- test stage: runtime deps + pytest; `make test` mounts the source -------
+FROM build AS test
+COPY app/requirements-dev.txt /tmp/requirements-dev.txt
+RUN /venv/bin/pip install -r /tmp/requirements-dev.txt
+ENV PATH="/venv/bin:$PATH" PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /src
+CMD ["pytest"]
+
+# --- runtime stage (default target): venv + code only, non-root ------------------------------
 FROM python:3.11-slim
 
 ARG APP_VERSION=dev
