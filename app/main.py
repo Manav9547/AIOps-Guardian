@@ -12,9 +12,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app import db, metrics
+from app import logging as applog
 from app.admission import SEARCH_QUEUE_TIMEOUT, QueueFull, search_limiter
 
 APP_VERSION = os.getenv("APP_VERSION", "dev")
+
+# JSON lines on stdout for Filebeat; runs after uvicorn's own logging setup.
+applog.setup()
 
 
 @asynccontextmanager
@@ -27,6 +31,8 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Booking API", version=APP_VERSION, lifespan=lifespan)
 metrics.instrument(app)
 metrics.track_search_limiter(search_limiter)
+# Added last so it is the outermost middleware: the request id exists for everything inside.
+applog.instrument(app)
 
 
 class BookingRequest(BaseModel):
