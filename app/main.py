@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from app import admin, db, faults, metrics
+from app import admin, cache, db, faults, metrics
 from app import logging as applog
 from app.admission import SEARCH_QUEUE_TIMEOUT, QueueFull, search_limiter
 
@@ -58,7 +58,12 @@ async def health():
 
 @app.get("/search")
 async def search(origin: str | None = None, destination: str | None = None):
-    """Trains with seats left. Waits up to SEARCH_QUEUE_TIMEOUT for a slot, else 429."""
+    """Trains with seats left. Waits up to SEARCH_QUEUE_TIMEOUT for a slot, else 429.
+
+    In cache mode (PUT /admin/cache-mode) it answers from memory: no slot, no DB.
+    """
+    if cache.enabled():
+        return {"trains": cache.search(origin, destination), "cached": True}
     try:
         async with search_limiter.slot(SEARCH_QUEUE_TIMEOUT):
             trains = await db.search_trains(origin, destination)
@@ -68,7 +73,7 @@ async def search(origin: str | None = None, destination: str | None = None):
             content={"detail": "search is busy, try again shortly"},
             headers={"Retry-After": "1"},
         )
-    return {"trains": trains}
+    return {"trains": trains, "cached": False}
 
 
 @app.post("/book", status_code=201)
