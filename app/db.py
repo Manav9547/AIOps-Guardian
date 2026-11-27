@@ -14,6 +14,8 @@ from pathlib import Path
 
 import asyncpg
 
+from app import faults
+
 log = logging.getLogger(__name__)
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
@@ -115,7 +117,11 @@ SEARCH_SQL = """
 
 async def search_trains(origin: str | None, destination: str | None) -> list[dict]:
     """Trains with seats left, optionally filtered by route. Search pool only."""
+    delay = faults.slow_db_delay()
     async with search_pool().acquire() as conn:
+        if delay:
+            # slow_db fault: hold this search-pool connection like a slow query would.
+            await conn.execute("SELECT pg_sleep($1)", delay)
         rows = await conn.fetch(SEARCH_SQL, origin, destination)
     return [dict(row) for row in rows]
 
