@@ -50,8 +50,8 @@ versions: ## Print installed tool versions to compare with the README
 
 ##@ Local development
 
-dev-up: .env ## Start the dev stack (Postgres now; app added in commit 13)
-	$(DEV_COMPOSE) up -d --wait
+dev-up: .env ## Build and start the app + Postgres (app on localhost:8000)
+	$(DEV_COMPOSE) up -d --build --wait
 
 dev-down: ## Stop the dev compose stack (keeps the DB volume)
 	$(DEV_COMPOSE) down

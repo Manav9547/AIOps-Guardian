@@ -1,9 +1,27 @@
-# Local development stack. Commit 2: Postgres only; the app service is added
-# in commit 13. Values come from .env (copy .env.example). Never used in the
-# cluster: there, secrets come from Vault.
+# Local development stack: booking API + Postgres. Values come from .env
+# (copy .env.example). Never used in the cluster: there, secrets come from Vault.
 name: aiops-dev
 
 services:
+  app:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    image: booking-api:dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres          # the compose service, not localhost
+      POSTGRES_PORT: 5432              # container port, whatever is published
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   postgres:
     image: postgres:16
     restart: unless-stopped
