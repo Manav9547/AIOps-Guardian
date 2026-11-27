@@ -126,6 +126,14 @@ async def search_trains(origin: str | None, destination: str | None) -> list[dic
     return [dict(row) for row in rows]
 
 
+async def snapshot_trains() -> list[dict]:
+    """All trains with seats left, for cache mode. Critical pool: one short query
+    that must work even while slow_db holds every search connection."""
+    async with critical_pool().acquire() as conn:
+        rows = await conn.fetch(SEARCH_SQL, None, None)
+    return [dict(row) for row in rows]
+
+
 async def book(train_id: int, passenger: str, seats: int) -> dict:
     """Reserve seats, create the booking and record its payment in ONE transaction.
 

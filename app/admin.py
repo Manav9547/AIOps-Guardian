@@ -1,4 +1,7 @@
-"""Token-protected admin endpoints (commit 9; cache mode and search slots in commit 10).
+"""Token-protected admin endpoints.
+
+  commit 9   GET  /admin/faults, POST /admin/fault/{name}
+  commit 10  GET  /admin/state, PUT /admin/cache-mode, PUT /admin/search-slots
 
 Every /admin call needs the header  Authorization: Bearer <ADMIN_TOKEN>.
 Without it, or with a wrong token, the answer is 401. If ADMIN_TOKEN is not set
@@ -15,9 +18,12 @@ import os
 import secrets
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from app import faults
+from app import cache, faults
+from app.admission import search_limiter
+
+MAX_SEARCH_SLOTS = 100
 
 
 def _admin_token() -> str:
@@ -41,6 +47,46 @@ router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(requir
 
 class FaultUpdate(BaseModel):
     enabled: bool
+
+
+class CacheUpdate(BaseModel):
+    enabled: bool
+
+
+class SlotsUpdate(BaseModel):
+    slots: int = Field(ge=1, le=MAX_SEARCH_SLOTS)
+
+
+def _search_state() -> dict:
+    return {
+        "cache": cache.state(),
+        "slots": search_limiter.slots,
+        "in_use": search_limiter.used,
+        "waiting": search_limiter.waiting,
+    }
+
+
+@router.get("/state")
+async def get_state() -> dict:
+    """Everything the chaos panel and the guardian need in one call."""
+    return {"faults": faults.state(), "search": _search_state()}
+
+
+@router.put("/cache-mode")
+async def set_cache_mode(update: CacheUpdate) -> dict:
+    """Cache mode on: /search answers from an in-memory snapshot and skips the DB."""
+    if update.enabled:
+        await cache.enable()
+    else:
+        cache.disable()
+    return {"search": _search_state()}
+
+
+@router.put("/search-slots")
+async def set_search_slots(update: SlotsUpdate) -> dict:
+    """Resize the /search queue live. Requests already holding a slot finish normally."""
+    await search_limiter.resize(update.slots)
+    return {"search": _search_state()}
 
 
 @router.get("/faults")
