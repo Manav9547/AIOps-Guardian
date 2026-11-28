@@ -37,7 +37,7 @@ Both members confirm these at commit 1. If a machine differs, update this table.
 | Postgres                     | 16                                            |
 | Minikube / Kubernetes        | 1.34 (Docker driver) / 1.31                   |
 | Helm / Ansible               | 3.16 / 2.17                                   |
-| Jenkins                      | LTS 2.479                                     |
+| Jenkins                      | LTS 2.580.2 on Java 21 ([setup](docs/setup-jenkins.md)) |
 | Elastic stack (all 4 parts)  | 8.15.3                                        |
 | Prometheus chart             | `prometheus-community/prometheus` 25.x        |
 | Vault chart                  | `hashicorp/vault` 0.28, dev mode              |
