@@ -6,9 +6,10 @@ Run locally from the repo root:
 
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from app import admin, cache, db, faults, metrics
@@ -16,6 +17,7 @@ from app import logging as applog
 from app.admission import SEARCH_QUEUE_TIMEOUT, QueueFull, search_limiter
 
 APP_VERSION = os.getenv("APP_VERSION", "dev")
+CHAOS_PANEL = Path(__file__).with_name("static") / "chaos.html"
 
 # JSON lines on stdout for Filebeat; runs after uvicorn's own logging setup.
 applog.setup()
@@ -46,6 +48,12 @@ class BookingRequest(BaseModel):
 @app.get("/")
 async def root() -> dict:
     return {"service": "booking-api", "version": APP_VERSION}
+
+
+@app.get("/chaos", include_in_schema=False)
+async def chaos_panel():
+    """Chaos control panel. The page is public; every action it takes needs the admin token."""
+    return FileResponse(CHAOS_PANEL, media_type="text/html")
 
 
 @app.get("/health")

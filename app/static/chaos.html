@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chaos control panel · Booking API</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --text: #1d2430; --muted: #5d6879; --line: #dde2ea;
+    --on: #c62828; --on-bg: #fdecec; --off: #2e7d32; --off-bg: #e9f5ea;
+    --accent: #2457c5; --warn-bg: #fff6e0; --warn: #8a5a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b; --card: #1b2029; --text: #e7ebf2; --muted: #9aa5b5; --line: #2c3340;
+      --on: #ff7b72; --on-bg: #3a1d1d; --off: #6fcf7a; --off-bg: #1b3320;
+      --accent: #7aa2ff; --warn-bg: #3a2f14; --warn: #f2c35b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         background: var(--bg); color: var(--text); }
+  main { max-width: 880px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 1.4rem; margin: 0; }
+  h2 { font-size: 1rem; margin: 28px 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .meta { color: var(--muted); font-size: .9rem; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--muted); margin-right: 6px; }
+  .dot.ok { background: var(--off); } .dot.bad { background: var(--on); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .fault h3 { margin: 0; font-size: 1.05rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .fault p { margin: 6px 0 12px; color: var(--muted); font-size: .9rem; min-height: 2.6em; }
+  .pill { font-size: .78rem; font-weight: 700; padding: 2px 9px; border-radius: 999px; letter-spacing: .03em; }
+  .pill.on { color: var(--on); background: var(--on-bg); }
+  .pill.off { color: var(--off); background: var(--off-bg); }
+  .pill.unknown { color: var(--muted); background: var(--line); }
+  button { font: inherit; padding: 7px 14px; border-radius: 7px; border: 1px solid var(--line);
+           background: var(--card); color: var(--text); cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger { color: var(--on); }
+  input { font: inherit; padding: 7px 10px; border-radius: 7px; border: 1px solid var(--line);
+          background: var(--bg); color: var(--text); }
+  input[type=number] { width: 80px; }
+  .grow { flex: 1; min-width: 200px; }
+  .stats { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 12px; }
+  .stat b { display: block; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: .85rem; }
+  #banner { display: none; margin-top: 16px; padding: 10px 14px; border-radius: 8px;
+            background: var(--warn-bg); color: var(--warn); }
+  #banner.show { display: block; }
+  footer { margin-top: 28px; color: var(--muted); font-size: .85rem; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Chaos control panel</h1>
+    <span class="meta"><span id="conn" class="dot"></span><span id="service">connecting…</span></span>
+  </header>
+
+  <div id="banner" role="alert"></div>
+
+  <h2>Admin token</h2>
+  <form id="token-form" class="card row" autocomplete="off">
+    <input id="token" class="grow" type="password" placeholder="ADMIN_TOKEN from your .env" aria-label="Admin token">
+    <button class="primary" type="submit">Save</button>
+    <span class="meta">Kept in this browser only.</span>
+  </form>
+
+  <h2>Faults <span class="meta">(this pod)</span></h2>
+  <div class="grid" id="faults"></div>
+  <div class="row" style="margin-top:12px">
+    <button id="all-off" class="danger" type="button">Switch all faults off</button>
+  </div>
+
+  <h2>Search</h2>
+  <div class="card">
+    <div class="row">
+      <strong class="grow">Cache mode <span class="meta">— /search answers from memory and skips the DB</span></strong>
+      <span id="cache-pill" class="pill unknown">—</span>
+      <button id="cache-btn" type="button">Toggle</button>
+    </div>
+    <hr style="border:none;border-top:1px solid var(--line);margin:14px 0">
+    <form id="slots-form" class="row">
+      <label class="grow" for="slots"><strong>Search slots</strong>
+        <span class="meta">— concurrent searches before requests queue (2 s), then 429</span></label>
+      <input id="slots" type="number" min="1" max="100" required>
+      <button type="submit">Set</button>
+    </form>
+    <div class="stats">
+      <div class="stat"><b id="s-slots">—</b><span>slots</span></div>
+      <div class="stat"><b id="s-inuse">—</b><span>in use</span></div>
+      <div class="stat"><b id="s-waiting">—</b><span>waiting</span></div>
+      <div class="stat"><b id="s-cache">—</b><span>cached trains</span></div>
+    </div>
+  </div>
+
+  <footer>
+    Refreshes every 3 s while this tab is visible · last update <span id="updated">never</span><br>
+    Each pod has its own faults; behind a Service this panel talks to whichever pod answers.
+  </footer>
+</main>
+
+<script>
+"use strict";
+const TOKEN_KEY = "aiops-admin-token";
+const POLL_MS = 3000;
+const FAULTS = {
+  cpu_hog:     "Child process spins one core: container CPU ~1 core at normal traffic, HPA scales.",
+  memory_leak: "Adds 2 MB every 5 s: container memory climbs in a straight line.",
+  slow_db:     "Every search waits 0.5 s in Postgres: search p95 up, CPU low, /book unaffected.",
+};
+
+const $ = (id) => document.getElementById(id);
+let state = null;
+let busy = false;
+
+function token() { return localStorage.getItem(TOKEN_KEY) || ""; }
+
+function banner(msg) {
+  const b = $("banner");
+  b.textContent = msg || "";
+  b.classList.toggle("show", Boolean(msg));
+}
+
+function setPill(el, on) {
+  el.className = "pill " + (on === undefined ? "unknown" : on ? "on" : "off");
+  el.textContent = on === undefined ? "—" : on ? "ON" : "OFF";
+}
+
+async function api(method, path, body) {
+  const res = await fetch(path, {
+    method,
+    headers: Object.assign(
+      { "Authorization": "Bearer " + token() },
+      body === undefined ? {} : { "Content-Type": "application/json" }),
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (res.status === 401) throw new Error("Token rejected: enter the ADMIN_TOKEN from your .env above.");
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { detail = JSON.stringify((await res.json()).detail); } catch (_) { /* keep statusText */ }
+    throw new Error(method + " " + path + " failed (" + res.status + "): " + detail);
+  }
+  return res.json();
+}
+
+function buildFaultCards() {
+  const grid = $("faults");
+  for (const [name, desc] of Object.entries(FAULTS)) {
+    const card = document.createElement("div");
+    card.className = "card fault";
+    const top = document.createElement("div");
+    top.className = "row";
+    const h = document.createElement("h3");
+    h.className = "grow";
+    h.textContent = name;
+    const pill = document.createElement("span");
+    pill.id = "pill-" + name;
+    setPill(pill, undefined);
+    top.append(h, pill);
+    const p = document.createElement("p");
+    p.textContent = desc;
+    const btn = document.createElement("button");
+    btn.id = "btn-" + name;
+    btn.type = "button";
+    btn.textContent = "Turn on";
+    btn.addEventListener("click", () => act(() =>
+      api("POST", "/admin/fault/" + name, { enabled: !(state && state.faults[name]) })));
+    card.append(top, p, btn);
+    grid.append(card);
+  }
+}
+
+function render() {
+  const s = state;
+  for (const name of Object.keys(FAULTS)) {
+    const on = s ? s.faults[name] : undefined;
+    setPill($("pill-" + name), on);
+    const btn = $("btn-" + name);
+    btn.textContent = on ? "Turn off" : "Turn on";
+    btn.disabled = !s || busy;
+  }
+  const cacheOn = s ? s.search.cache.enabled : undefined;
+  setPill($("cache-pill"), cacheOn);
+  $("cache-btn").textContent = cacheOn ? "Turn off" : "Turn on";
+  $("cache-btn").disabled = !s || busy;
+  $("all-off").disabled = !s || busy;
+  $("s-slots").textContent = s ? s.search.slots : "—";
+  $("s-inuse").textContent = s ? s.search.in_use : "—";
+  $("s-waiting").textContent = s ? s.search.waiting : "—";
+  $("s-cache").textContent = s && s.search.cache.enabled ? s.search.cache.trains : "—";
+  const slotsInput = $("slots");
+  if (s && document.activeElement !== slotsInput) slotsInput.value = s.search.slots;
+}
+
+async function refresh() {
+  try {
+    state = await api("GET", "/admin/state");
+    $("conn").className = "dot ok";
+    $("updated").textContent = new Date().toLocaleTimeString();
+    banner("");
+  } catch (err) {
+    state = null;
+    $("conn").className = "dot bad";
+    banner(err.message);
+  }
+  render();
+}
+
+async function act(fn) {
+  busy = true; render();
+  try { await fn(); } catch (err) { banner(err.message); }
+  busy = false;
+  await refresh();
+}
+
+$("token-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  localStorage.setItem(TOKEN_KEY, $("token").value.trim());
+  $("token").value = "";
+  $("token").placeholder = "token saved";
+  refresh();
+});
+
+$("cache-btn").addEventListener("click", () => act(() =>
+  api("PUT", "/admin/cache-mode", { enabled: !(state && state.search.cache.enabled) })));
+
+$("slots-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const slots = Number($("slots").value);
+  act(() => api("PUT", "/admin/search-slots", { slots }));
+  $("slots").blur();
+});
+
+$("all-off").addEventListener("click", () => act(async () => {
+  for (const name of Object.keys(FAULTS)) {
+    await api("POST", "/admin/fault/" + name, { enabled: false });
+  }
+}));
+
+async function loadService() {
+  try {
+    const info = await (await fetch("/")).json();
+    $("service").textContent = info.service + " · " + info.version;
+  } catch (_) {
+    $("service").textContent = "service unreachable";
+  }
+}
+
+buildFaultCards();
+if (token()) $("token").placeholder = "token saved (enter a new one to replace it)";
+loadService();
+refresh();
+setInterval(() => { if (!document.hidden) refresh(); }, POLL_MS);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+</script>
+</body>
+</html>
