@@ -46,8 +46,9 @@ def test_search_429_when_every_slot_is_busy(client, clean_state, monkeypatch):
 
 
 def test_search_in_cache_mode_skips_db_and_queue(client, fake_db, clean_state, monkeypatch):
-    from app import cache
     import anyio
+
+    from app import cache
 
     anyio.run(cache.enable)
     monkeypatch.setattr(main, "SEARCH_QUEUE_TIMEOUT", 0.05)

@@ -26,7 +26,7 @@ import logging
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import FastAPI, Request
 
@@ -51,8 +51,9 @@ class JsonFormatter(logging.Formatter):
     """One JSON object per line. Extra fields passed via `extra=` become top-level keys."""
 
     def format(self, record: logging.LogRecord) -> str:
+        ts = datetime.fromtimestamp(record.created, tz=UTC).isoformat(timespec="milliseconds")
         entry = {
-            "time": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+            "time": ts.replace("+00:00", "Z"),
             "level": record.levelname,
             "component": COMPONENT,
             "logger": record.name,

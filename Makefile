@@ -12,6 +12,8 @@ GUARD_IMAGE := $(DOCKER_USER)/aiops-guardian
 # Docker Compose v2 plugin if present, else the standalone binary
 COMPOSE     ?= $(shell docker compose version >/dev/null 2>&1 && echo "docker compose" || echo docker-compose)
 DEV_COMPOSE := $(COMPOSE) -f docker-compose.dev.yml --env-file .env
+# Python code ruff checks; guardian/ and ml/ join automatically once they exist.
+LINT_PATHS  := app $(wildcard guardian ml)
 
 define todo
 	@echo "make $@: not implemented yet (added in commit $(1))" >&2; exit 1
@@ -19,7 +21,7 @@ endef
 
 .PHONY: help versions \
         dev-up dev-down \
-        lint test \
+        lint test ci-clean \
         train \
         images push check-blocked \
         deploy-booking deploy-guardian smoke \
@@ -62,11 +64,19 @@ dev-down: ## Stop the dev compose stack (keeps the DB volume)
 
 ##@ Quality
 
-lint: ## Run ruff over app/ and guardian/ (commit 14)
-	$(call todo,14)
+lint: .env ## Run ruff (rules in ruff.toml) in the test image; no DB needed
+	$(DEV_COMPOSE) --profile test run --rm --build --no-deps test ruff check --no-cache $(LINT_PATHS)
 
 test: .env ## Run tests in a Python 3.11 container with Postgres (ARGS="-k admin" to filter)
 	$(DEV_COMPOSE) --profile test run --rm --build test pytest $(ARGS)
+
+ci-clean: .env ## Remove a CI build's containers and volumes (only when COMPOSE_PROJECT_NAME=aiops-ci-*)
+	@case "$$COMPOSE_PROJECT_NAME" in \
+		aiops-ci-*) ;; \
+		*) echo "ci-clean: refusing: COMPOSE_PROJECT_NAME must start with aiops-ci- (got '$$COMPOSE_PROJECT_NAME')." \
+		        "This guard keeps it from deleting the dev database." >&2; exit 1;; \
+	esac
+	$(DEV_COMPOSE) --profile test down -v --remove-orphans
 
 ##@ Build and release
 
