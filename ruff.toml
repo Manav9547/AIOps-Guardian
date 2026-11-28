@@ -1,0 +1,11 @@
+# Lint rules for `make lint` (commit 14). Run inside the test image, so the
+# ruff version is pinned in app/requirements-dev.txt.
+target-version = "py311"
+line-length = 120
+
+[lint]
+# E/W pycodestyle, F pyflakes, I import order, B bugbear, UP pyupgrade
+select = ["E", "W", "F", "I", "B", "UP"]
+
+[lint.isort]
+known-first-party = ["app", "guardian", "ml"]
