@@ -27,8 +27,9 @@ from prometheus_client import (
 # Own registry: only app metrics, and tests can import this module repeatedly.
 REGISTRY = CollectorRegistry(auto_describe=True)
 
-# Probe and scrape traffic would inflate the request rate the guardian reads.
-EXCLUDED_PATHS = frozenset({"/metrics", "/health"})
+# Probe, scrape and chaos-panel polling traffic would inflate the request rate
+# the guardian reads. (Admin actions such as POST /admin/fault/* still count.)
+EXCLUDED_PATHS = frozenset({"/metrics", "/health", "/admin/state", "/chaos"})
 
 REQUESTS = Counter(
     "http_requests_total",

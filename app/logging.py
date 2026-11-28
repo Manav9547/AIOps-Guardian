@@ -33,8 +33,9 @@ from fastapi import FastAPI, Request
 REQUEST_ID_HEADER = "X-Request-ID"
 COMPONENT = "booking-api"
 
-# Probes every few seconds would drown the real traffic in Kibana.
-QUIET_PATHS = frozenset({"/metrics", "/health"})
+# Probes and the chaos panel's polling every few seconds would drown the real
+# traffic in Kibana. Errors on these paths are still logged.
+QUIET_PATHS = frozenset({"/metrics", "/health", "/admin/state", "/chaos"})
 
 request_id_var: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="-")
 
